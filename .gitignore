@@ -1,0 +1,35 @@
+# =========================
+# Terraform
+# =========================
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Local project folders
+# =========================
+axion-data-simulator/
+axion-database-schema/
+axion-ingestion-service/
+axion-telemetry-service/
+axion-ui/
+.DS_Store
