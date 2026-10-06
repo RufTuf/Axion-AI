@@ -7,7 +7,7 @@ pool: Default
 
 variables:
 
-  azureServiceConnection: 'aks-service-connection'
+  azureServiceConnection: 'axion_service_connection'
 
   resourceGroup: 'axion-rg1'
 
