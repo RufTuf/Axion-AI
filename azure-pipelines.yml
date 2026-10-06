@@ -33,7 +33,7 @@ variables:
 
   # Repository structure:
   # Axion_AI_Ops/k8s/
-  k8sDirectory: '$(Build.SourcesDirectory)/Axion_AI_Ops/k8s'
+  k8sDirectory: '$(Build.SourcesDirectory)/Axion_AI_Ops'
 
 
 # ============================================================
