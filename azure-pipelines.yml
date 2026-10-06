@@ -1,0 +1,175 @@
+name: postgres
+
+trigger:
+- main
+
+pool: Default
+
+variables:
+
+  azureServiceConnection: 'aks-service-connection'
+
+  resourceGroup: 'axion-rg1'
+
+  aksCluster: 'axion-aks1'
+
+
+stages:
+
+# ============================================================
+# STAGE 1 - AKS CONNECTION
+# ============================================================
+
+  - stage: AKS_Connection
+    displayName: Connect to AKS
+    jobs:
+      - job: connect
+        displayName: 'Get AKS Credentials'
+        steps:
+        - task: AzureCLI@3
+          inputs:
+            connectionType: 'azureRM'
+            azureSubscription: 'axion_service_connection'
+            scriptType: 'batch'
+            scriptLocation: 'inlineScript'
+            inlineScript: |
+              echo "Getting AKS credentials..."
+              
+              az aks get-credentials --resource-group axion-rg1 --name axion-aks1 --overwrite-existing
+              
+                        echo "Checking cluster..."
+              
+                        kubectl get nodes
+
+# ============================================================
+# STAGE 2 - DEPLOY POSTGRESQL
+# ============================================================
+
+  - stage: Deploy_PostgreSQL
+
+    displayName: 'Deploy PostgreSQL'
+
+    dependsOn: AKS_Connection
+
+    jobs:
+
+    - job: PostgreSQL
+
+      displayName: 'Deploy PostgreSQL'
+
+      steps:
+
+      - task: AzureCLI@2
+
+        displayName: 'Deploy PostgreSQL'
+
+        inputs:
+          azureSubscription: '$(azureServiceConnection)'
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+
+          inlineScript: |
+
+            echo "Deploying PostgreSQL..."
+
+            kubectl apply -f k8s/postgresssql.yml
+
+
+            echo "Creating PostgreSQL Service..."
+
+            kubectl apply -f k8s/postgres-service.yaml
+
+
+            echo "PostgreSQL resources:"
+
+
+
+
+  # ============================================================
+  # STAGE 3 - DEPLOY PGADMIN
+  # ============================================================
+
+  - stage: Deploy_pgAdmin
+
+    displayName: 'Deploy pgAdmin'
+
+    dependsOn: Deploy_PostgreSQL
+
+    jobs:
+
+    - job: pgAdmin
+
+      displayName: 'Deploy pgAdmin'
+
+      steps:
+
+      - task: AzureCLI@2
+
+        displayName: 'Deploy pgAdmin'
+
+        inputs:
+          azureSubscription: '$(azureServiceConnection)'
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+
+          inlineScript: |
+            echo "Deploying pgadmin..."
+
+            kubectl apply -f k8s/pgadmin-deployment.yml
+
+            echo "Creating Pgadmin Service..."
+
+            kubectl apply -f k8s/pgadmin-service.yaml
+
+
+
+            echo "Checking pgAdmin..."
+
+            kubectl get pods
+
+            kubectl get svc
+
+
+  # ============================================================
+  # STAGE 4 - VERIFY
+  # ============================================================
+
+  - stage: Verify
+
+    displayName: 'Verify Deployment'
+
+    dependsOn: Deploy_pgAdmin
+
+    jobs:
+
+    - job: Verify
+
+      displayName: 'Verify PostgreSQL and pgAdmin'
+
+      steps:
+
+      - task: AzureCLI@2
+
+        displayName: 'Verify Kubernetes Resources'
+
+        inputs:
+          azureSubscription: '$(azureServiceConnection)'
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+
+          inlineScript: |
+
+            echo "======================================"
+            echo "Pods"
+            echo "======================================"
+
+            kubectl get pods
+
+
+            echo "======================================"
+            echo "Services"
+            echo "======================================"
+
+            kubectl get svc
+
+            kubectl get deployments
