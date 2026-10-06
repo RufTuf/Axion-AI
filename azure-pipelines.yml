@@ -21,10 +21,14 @@ stages:
   displayName: 'Connect to AKS'
 
   jobs:
-  - job: connect
+  - job: Connect
     displayName: 'Get AKS Credentials'
 
     steps:
+
+    - checkout: self
+      displayName: 'Checkout Repository'
+
     - task: AzureCLI@2
       displayName: 'Connect to AKS'
       inputs:
@@ -34,6 +38,7 @@ stages:
         scriptLocation: 'inlineScript'
 
         inlineScript: |
+
           set -e
 
           echo "======================================"
@@ -79,6 +84,66 @@ stages:
 
     steps:
 
+    # --------------------------------------------------------
+    # CHECKOUT REPOSITORY
+    # --------------------------------------------------------
+
+    - checkout: self
+      displayName: 'Checkout Repository'
+
+    # --------------------------------------------------------
+    # CHECK KUBERNETES FILES
+    # --------------------------------------------------------
+
+    - bash: |
+
+        set -e
+
+        echo "======================================"
+        echo "Working Directory"
+        echo "======================================"
+
+        pwd
+
+        echo "======================================"
+        echo "Build Sources Directory"
+        echo "======================================"
+
+        echo "$(Build.SourcesDirectory)"
+
+        echo "======================================"
+        echo "Repository Files"
+        echo "======================================"
+
+        ls -la "$(Build.SourcesDirectory)"
+
+        echo "======================================"
+        echo "K8s Directory"
+        echo "======================================"
+
+        if [ -d "$(Build.SourcesDirectory)/k8s" ]; then
+          ls -la "$(Build.SourcesDirectory)/k8s"
+        else
+          echo "ERROR: k8s directory not found"
+          exit 1
+        fi
+
+        echo "======================================"
+        echo "Checking PostgreSQL YAML Files"
+        echo "======================================"
+
+        test -f "$(Build.SourcesDirectory)/k8s/postgresssql.yml"
+        test -f "$(Build.SourcesDirectory)/k8s/postgres-service.yaml"
+
+        echo "PostgreSQL YAML files found successfully."
+
+      displayName: 'Verify Kubernetes YAML Files'
+
+
+    # --------------------------------------------------------
+    # DEPLOY POSTGRESQL
+    # --------------------------------------------------------
+
     - task: AzureCLI@2
       displayName: 'Deploy PostgreSQL'
       inputs:
@@ -88,6 +153,7 @@ stages:
         scriptLocation: 'inlineScript'
 
         inlineScript: |
+
           set -e
 
           echo "======================================"
@@ -100,7 +166,7 @@ stages:
             --overwrite-existing
 
           echo "======================================"
-          echo "Current Context"
+          echo "Current Kubernetes Context"
           echo "======================================"
 
           kubectl config current-context
@@ -114,21 +180,10 @@ stages:
             -o yaml | kubectl apply -f -
 
           echo "======================================"
-          echo "Namespaces"
+          echo "Database Namespace"
           echo "======================================"
 
-          kubectl get namespaces
-
-          echo "======================================"
-          echo "Checking PostgreSQL YAML"
-          echo "======================================"
-
-          ls -la k8s/
-
-          test -f k8s/postgresssql.yml
-          test -f k8s/postgres-service.yaml
-
-          echo "PostgreSQL YAML files found."
+          kubectl get namespace database
 
           echo "======================================"
           echo "Deploying PostgreSQL"
@@ -136,7 +191,7 @@ stages:
 
           kubectl apply \
             -n database \
-            -f k8s/postgresssql.yml
+            -f "$(Build.SourcesDirectory)/k8s/postgresssql.yml"
 
           echo "======================================"
           echo "Creating PostgreSQL Service"
@@ -144,14 +199,24 @@ stages:
 
           kubectl apply \
             -n database \
-            -f k8s/postgres-service.yaml
+            -f "$(Build.SourcesDirectory)/k8s/postgres-service.yaml"
 
           echo "======================================"
-          echo "PostgreSQL Resources"
+          echo "PostgreSQL Deployments"
           echo "======================================"
 
-          kubectl get deployment -n database
-          kubectl get pods -n database
+          kubectl get deployments -n database
+
+          echo "======================================"
+          echo "PostgreSQL Pods"
+          echo "======================================"
+
+          kubectl get pods -n database -o wide
+
+          echo "======================================"
+          echo "PostgreSQL Services"
+          echo "======================================"
+
           kubectl get svc -n database
 
           echo "======================================"
@@ -176,6 +241,52 @@ stages:
 
     steps:
 
+    # --------------------------------------------------------
+    # CHECKOUT REPOSITORY
+    # --------------------------------------------------------
+
+    - checkout: self
+      displayName: 'Checkout Repository'
+
+
+    # --------------------------------------------------------
+    # CHECK PGADMIN YAML FILES
+    # --------------------------------------------------------
+
+    - bash: |
+
+        set -e
+
+        echo "======================================"
+        echo "Checking Repository"
+        echo "======================================"
+
+        pwd
+
+        ls -la "$(Build.SourcesDirectory)"
+
+        echo "======================================"
+        echo "Checking K8s Directory"
+        echo "======================================"
+
+        ls -la "$(Build.SourcesDirectory)/k8s"
+
+        echo "======================================"
+        echo "Checking pgAdmin YAML Files"
+        echo "======================================"
+
+        test -f "$(Build.SourcesDirectory)/k8s/pgadmin-deployment.yml"
+        test -f "$(Build.SourcesDirectory)/k8s/pgadmin-service.yaml"
+
+        echo "pgAdmin YAML files found successfully."
+
+      displayName: 'Verify pgAdmin YAML Files'
+
+
+    # --------------------------------------------------------
+    # DEPLOY PGADMIN
+    # --------------------------------------------------------
+
     - task: AzureCLI@2
       displayName: 'Deploy pgAdmin'
       inputs:
@@ -185,6 +296,7 @@ stages:
         scriptLocation: 'inlineScript'
 
         inlineScript: |
+
           set -e
 
           echo "======================================"
@@ -197,7 +309,7 @@ stages:
             --overwrite-existing
 
           echo "======================================"
-          echo "Current Context"
+          echo "Current Kubernetes Context"
           echo "======================================"
 
           kubectl config current-context
@@ -209,21 +321,12 @@ stages:
           kubectl get all -n database
 
           echo "======================================"
-          echo "Checking pgAdmin YAML"
-          echo "======================================"
-
-          test -f k8s/pgadmin-deployment.yml
-          test -f k8s/pgadmin-service.yaml
-
-          echo "pgAdmin YAML files found."
-
-          echo "======================================"
           echo "Deploying pgAdmin"
           echo "======================================"
 
           kubectl apply \
             -n database \
-            -f k8s/pgadmin-deployment.yml
+            -f "$(Build.SourcesDirectory)/k8s/pgadmin-deployment.yml"
 
           echo "======================================"
           echo "Creating pgAdmin Service"
@@ -231,14 +334,24 @@ stages:
 
           kubectl apply \
             -n database \
-            -f k8s/pgadmin-service.yaml
+            -f "$(Build.SourcesDirectory)/k8s/pgadmin-service.yaml"
 
           echo "======================================"
-          echo "pgAdmin Resources"
+          echo "pgAdmin Deployment"
           echo "======================================"
 
-          kubectl get deployment -n database
-          kubectl get pods -n database
+          kubectl get deployments -n database
+
+          echo "======================================"
+          echo "pgAdmin Pods"
+          echo "======================================"
+
+          kubectl get pods -n database -o wide
+
+          echo "======================================"
+          echo "pgAdmin Service"
+          echo "======================================"
+
           kubectl get svc -n database
 
           echo "======================================"
@@ -253,15 +366,27 @@ stages:
 # ============================================================
 
 - stage: Verify
-  displayName: 'Verify Deployment'
+  displayName: 'Verify PostgreSQL and pgAdmin'
 
   dependsOn: Deploy_pgAdmin
 
   jobs:
   - job: Verify
-    displayName: 'Verify PostgreSQL and pgAdmin'
+    displayName: 'Verify Kubernetes Resources'
 
     steps:
+
+    # --------------------------------------------------------
+    # CHECKOUT REPOSITORY
+    # --------------------------------------------------------
+
+    - checkout: self
+      displayName: 'Checkout Repository'
+
+
+    # --------------------------------------------------------
+    # VERIFY AKS
+    # --------------------------------------------------------
 
     - task: AzureCLI@2
       displayName: 'Verify Kubernetes Resources'
@@ -272,6 +397,7 @@ stages:
         scriptLocation: 'inlineScript'
 
         inlineScript: |
+
           set -e
 
           echo "======================================"
@@ -296,7 +422,7 @@ stages:
           kubectl get namespaces
 
           echo "======================================"
-          echo "Deployments"
+          echo "PostgreSQL / pgAdmin Deployments"
           echo "======================================"
 
           kubectl get deployments -n database
@@ -326,8 +452,13 @@ stages:
           kubectl get all -n database
 
           echo "======================================"
-          echo "ALL CLUSTER RESOURCES"
+          echo "ALL CLUSTER PODS"
           echo "======================================"
 
           kubectl get pods -A
+
+          echo "======================================"
+          echo "ALL CLUSTER SERVICES"
+          echo "======================================"
+
           kubectl get svc -A
