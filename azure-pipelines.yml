@@ -1,464 +1,703 @@
-name: postgres
+# ============================================================
+# AZURE DEVOPS PIPELINE
+# PostgreSQL + pgAdmin on AKS
+# ============================================================
+
+name: postgres-pgadmin
+
+# ============================================================
+# TRIGGER
+# ============================================================
 
 trigger:
 - main
 
+# ============================================================
+# AGENT POOL
+# ============================================================
+
 pool:
   name: Default
 
+# ============================================================
+# VARIABLES
+# ============================================================
+
 variables:
+
   azureServiceConnection: 'axion_service_connection'
+
   resourceGroup: 'axion-rg1'
+
   aksCluster: 'axion-aks1'
+
+  # Repository structure:
+  # Axion_AI_Ops/k8s/
+  k8sDirectory: '$(Build.SourcesDirectory)/Axion_AI_Ops/k8s'
+
+
+# ============================================================
+# STAGES
+# ============================================================
 
 stages:
 
+
 # ============================================================
-# STAGE 1 - AKS CONNECTION
+# STAGE 1
+# CONNECT TO AKS
 # ============================================================
 
 - stage: AKS_Connection
-  displayName: 'Connect to AKS'
+
+  displayName: '1. Connect to AKS'
 
   jobs:
-  - job: Connect
-    displayName: 'Get AKS Credentials'
+
+  - job: ConnectToAKS
+
+    displayName: 'Connect and Verify AKS'
 
     steps:
 
+    # --------------------------------------------------------
+    # Checkout Repository
+    # --------------------------------------------------------
+
     - checkout: self
-      displayName: 'Checkout Repository'
+
+
+    # --------------------------------------------------------
+    # Azure Login + AKS Connection
+    # --------------------------------------------------------
 
     - task: AzureCLI@2
-      displayName: 'Connect to AKS'
+
+      displayName: 'Login and Connect to AKS'
+
       inputs:
+
         connectionType: 'Azure Resource Manager'
+
         azureSubscription: '$(azureServiceConnection)'
+
         scriptType: 'bash'
+
         scriptLocation: 'inlineScript'
 
         inlineScript: |
 
           set -e
 
-          echo "======================================"
-          echo "Azure Account"
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "AZURE ACCOUNT"
+          echo "=========================================="
 
           az account show
 
-          echo "======================================"
-          echo "Getting AKS Credentials"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "GETTING AKS CREDENTIALS"
+          echo "=========================================="
 
           az aks get-credentials \
             --resource-group "$(resourceGroup)" \
             --name "$(aksCluster)" \
             --overwrite-existing
 
-          echo "======================================"
-          echo "Current Kubernetes Context"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "CURRENT KUBERNETES CONTEXT"
+          echo "=========================================="
 
           kubectl config current-context
 
-          echo "======================================"
-          echo "AKS Nodes"
-          echo "======================================"
 
-          kubectl get nodes
+          echo ""
+          echo "=========================================="
+          echo "AKS NODES"
+          echo "=========================================="
+
+          kubectl get nodes -o wide
 
 
 # ============================================================
-# STAGE 2 - DEPLOY POSTGRESQL
+# STAGE 2
+# DEPLOY POSTGRESQL
 # ============================================================
 
 - stage: Deploy_PostgreSQL
-  displayName: 'Deploy PostgreSQL'
+
+  displayName: '2. Deploy PostgreSQL'
 
   dependsOn: AKS_Connection
 
   jobs:
+
   - job: PostgreSQL
+
     displayName: 'Deploy PostgreSQL'
 
     steps:
 
     # --------------------------------------------------------
-    # CHECKOUT REPOSITORY
+    # Checkout Repository
     # --------------------------------------------------------
 
     - checkout: self
-      displayName: 'Checkout Repository'
+
 
     # --------------------------------------------------------
-    # CHECK KUBERNETES FILES
+    # Verify Kubernetes Directory
     # --------------------------------------------------------
 
     - bash: |
 
         set -e
 
-        echo "======================================"
-        echo "Working Directory"
-        echo "======================================"
-
-        pwd
-
-        echo "======================================"
-        echo "Build Sources Directory"
-        echo "======================================"
+        echo ""
+        echo "=========================================="
+        echo "BUILD SOURCES DIRECTORY"
+        echo "=========================================="
 
         echo "$(Build.SourcesDirectory)"
 
-        echo "======================================"
-        echo "Repository Files"
-        echo "======================================"
+
+        echo ""
+        echo "=========================================="
+        echo "KUBERNETES DIRECTORY"
+        echo "=========================================="
+
+        echo "$(k8sDirectory)"
+
+
+        echo ""
+        echo "=========================================="
+        echo "REPOSITORY ROOT"
+        echo "=========================================="
 
         ls -la "$(Build.SourcesDirectory)"
 
-        echo "======================================"
-        echo "K8s Directory"
-        echo "======================================"
 
-        if [ -d "$(Build.SourcesDirectory)/k8s" ]; then
-          ls -la "$(Build.SourcesDirectory)/k8s"
-        else
-          echo "ERROR: k8s directory not found"
-          exit 1
-        fi
+        echo ""
+        echo "=========================================="
+        echo "K8S DIRECTORY"
+        echo "=========================================="
 
-        echo "======================================"
-        echo "Checking PostgreSQL YAML Files"
-        echo "======================================"
+        test -d "$(k8sDirectory)"
 
-        test -f "$(Build.SourcesDirectory)/k8s/postgresssql.yml"
-        test -f "$(Build.SourcesDirectory)/k8s/postgres-service.yaml"
+        ls -la "$(k8sDirectory)"
 
+
+        echo ""
+        echo "=========================================="
+        echo "CHECKING POSTGRESQL YAML FILES"
+        echo "=========================================="
+
+        test -f "$(k8sDirectory)/postgresssql.yml"
+
+        test -f "$(k8sDirectory)/postgres-service.yaml"
+
+
+        echo ""
         echo "PostgreSQL YAML files found successfully."
 
-      displayName: 'Verify Kubernetes YAML Files'
+      displayName: 'Verify PostgreSQL YAML Files'
 
 
     # --------------------------------------------------------
-    # DEPLOY POSTGRESQL
+    # Deploy PostgreSQL
     # --------------------------------------------------------
 
     - task: AzureCLI@2
-      displayName: 'Deploy PostgreSQL'
+
+      displayName: 'Deploy PostgreSQL to AKS'
+
       inputs:
+
         connectionType: 'Azure Resource Manager'
+
         azureSubscription: '$(azureServiceConnection)'
+
         scriptType: 'bash'
+
         scriptLocation: 'inlineScript'
 
         inlineScript: |
 
           set -e
 
-          echo "======================================"
-          echo "Getting AKS Credentials"
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "GETTING AKS CREDENTIALS"
+          echo "=========================================="
 
           az aks get-credentials \
             --resource-group "$(resourceGroup)" \
             --name "$(aksCluster)" \
             --overwrite-existing
 
-          echo "======================================"
-          echo "Current Kubernetes Context"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "CURRENT KUBERNETES CONTEXT"
+          echo "=========================================="
 
           kubectl config current-context
 
-          echo "======================================"
-          echo "Creating Database Namespace"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "CREATING DATABASE NAMESPACE"
+          echo "=========================================="
 
           kubectl create namespace database \
             --dry-run=client \
             -o yaml | kubectl apply -f -
 
-          echo "======================================"
-          echo "Database Namespace"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "DATABASE NAMESPACE"
+          echo "=========================================="
 
           kubectl get namespace database
 
-          echo "======================================"
-          echo "Deploying PostgreSQL"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "DEPLOYING POSTGRESQL"
+          echo "=========================================="
 
           kubectl apply \
             -n database \
-            -f "$(Build.SourcesDirectory)/k8s/postgresssql.yml"
+            -f "$(k8sDirectory)/postgresssql.yml"
 
-          echo "======================================"
-          echo "Creating PostgreSQL Service"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "DEPLOYING POSTGRESQL SERVICE"
+          echo "=========================================="
 
           kubectl apply \
             -n database \
-            -f "$(Build.SourcesDirectory)/k8s/postgres-service.yaml"
+            -f "$(k8sDirectory)/postgres-service.yaml"
 
-          echo "======================================"
-          echo "PostgreSQL Deployments"
-          echo "======================================"
 
-          kubectl get deployments -n database
+          echo ""
+          echo "=========================================="
+          echo "POSTGRESQL DEPLOYMENT"
+          echo "=========================================="
 
-          echo "======================================"
-          echo "PostgreSQL Pods"
-          echo "======================================"
+          kubectl get deployments \
+            -n database
 
-          kubectl get pods -n database -o wide
 
-          echo "======================================"
-          echo "PostgreSQL Services"
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "POSTGRESQL PODS"
+          echo "=========================================="
 
-          kubectl get svc -n database
+          kubectl get pods \
+            -n database \
+            -o wide
 
-          echo "======================================"
-          echo "All Database Resources"
-          echo "======================================"
 
-          kubectl get all -n database
+          echo ""
+          echo "=========================================="
+          echo "POSTGRESQL SERVICE"
+          echo "=========================================="
+
+          kubectl get svc \
+            -n database
+
+
+          echo ""
+          echo "=========================================="
+          echo "DATABASE RESOURCES"
+          echo "=========================================="
+
+          kubectl get all \
+            -n database
 
 
 # ============================================================
-# STAGE 3 - DEPLOY PGADMIN
+# STAGE 3
+# DEPLOY PGADMIN
 # ============================================================
 
 - stage: Deploy_pgAdmin
-  displayName: 'Deploy pgAdmin'
+
+  displayName: '3. Deploy pgAdmin'
 
   dependsOn: Deploy_PostgreSQL
 
   jobs:
+
   - job: pgAdmin
+
     displayName: 'Deploy pgAdmin'
 
     steps:
 
     # --------------------------------------------------------
-    # CHECKOUT REPOSITORY
+    # Checkout Repository
     # --------------------------------------------------------
 
     - checkout: self
-      displayName: 'Checkout Repository'
 
 
     # --------------------------------------------------------
-    # CHECK PGADMIN YAML FILES
+    # Verify pgAdmin YAML Files
     # --------------------------------------------------------
 
     - bash: |
 
         set -e
 
-        echo "======================================"
-        echo "Checking Repository"
-        echo "======================================"
+        echo ""
+        echo "=========================================="
+        echo "KUBERNETES DIRECTORY"
+        echo "=========================================="
 
-        pwd
+        echo "$(k8sDirectory)"
 
-        ls -la "$(Build.SourcesDirectory)"
 
-        echo "======================================"
-        echo "Checking K8s Directory"
-        echo "======================================"
+        echo ""
+        echo "=========================================="
+        echo "K8S FILES"
+        echo "=========================================="
 
-        ls -la "$(Build.SourcesDirectory)/k8s"
+        test -d "$(k8sDirectory)"
 
-        echo "======================================"
-        echo "Checking pgAdmin YAML Files"
-        echo "======================================"
+        ls -la "$(k8sDirectory)"
 
-        test -f "$(Build.SourcesDirectory)/k8s/pgadmin-deployment.yml"
-        test -f "$(Build.SourcesDirectory)/k8s/pgadmin-service.yaml"
 
+        echo ""
+        echo "=========================================="
+        echo "CHECKING PGADMIN YAML FILES"
+        echo "=========================================="
+
+        test -f "$(k8sDirectory)/pgadmin-deployment.yml"
+
+        test -f "$(k8sDirectory)/pgadmin-service.yaml"
+
+
+        echo ""
         echo "pgAdmin YAML files found successfully."
 
       displayName: 'Verify pgAdmin YAML Files'
 
 
     # --------------------------------------------------------
-    # DEPLOY PGADMIN
+    # Deploy pgAdmin
     # --------------------------------------------------------
 
     - task: AzureCLI@2
-      displayName: 'Deploy pgAdmin'
+
+      displayName: 'Deploy pgAdmin to AKS'
+
       inputs:
+
         connectionType: 'Azure Resource Manager'
+
         azureSubscription: '$(azureServiceConnection)'
+
         scriptType: 'bash'
+
         scriptLocation: 'inlineScript'
 
         inlineScript: |
 
           set -e
 
-          echo "======================================"
-          echo "Getting AKS Credentials"
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "GETTING AKS CREDENTIALS"
+          echo "=========================================="
 
           az aks get-credentials \
             --resource-group "$(resourceGroup)" \
             --name "$(aksCluster)" \
             --overwrite-existing
 
-          echo "======================================"
-          echo "Current Kubernetes Context"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "CURRENT KUBERNETES CONTEXT"
+          echo "=========================================="
 
           kubectl config current-context
 
-          echo "======================================"
-          echo "Checking PostgreSQL"
-          echo "======================================"
 
-          kubectl get all -n database
+          echo ""
+          echo "=========================================="
+          echo "CHECKING POSTGRESQL"
+          echo "=========================================="
 
-          echo "======================================"
-          echo "Deploying pgAdmin"
-          echo "======================================"
+          kubectl get pods \
+            -n database
+
+          kubectl get svc \
+            -n database
+
+
+          echo ""
+          echo "=========================================="
+          echo "DEPLOYING PGADMIN"
+          echo "=========================================="
 
           kubectl apply \
             -n database \
-            -f "$(Build.SourcesDirectory)/k8s/pgadmin-deployment.yml"
+            -f "$(k8sDirectory)/pgadmin-deployment.yml"
 
-          echo "======================================"
-          echo "Creating pgAdmin Service"
-          echo "======================================"
+
+          echo ""
+          echo "=========================================="
+          echo "DEPLOYING PGADMIN SERVICE"
+          echo "=========================================="
 
           kubectl apply \
             -n database \
-            -f "$(Build.SourcesDirectory)/k8s/pgadmin-service.yaml"
+            -f "$(k8sDirectory)/pgadmin-service.yaml"
 
-          echo "======================================"
-          echo "pgAdmin Deployment"
-          echo "======================================"
 
-          kubectl get deployments -n database
+          echo ""
+          echo "=========================================="
+          echo "PGADMIN DEPLOYMENT"
+          echo "=========================================="
 
-          echo "======================================"
-          echo "pgAdmin Pods"
-          echo "======================================"
+          kubectl get deployments \
+            -n database
 
-          kubectl get pods -n database -o wide
 
-          echo "======================================"
-          echo "pgAdmin Service"
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "PGADMIN PODS"
+          echo "=========================================="
 
-          kubectl get svc -n database
+          kubectl get pods \
+            -n database \
+            -o wide
 
-          echo "======================================"
-          echo "All Database Resources"
-          echo "======================================"
 
-          kubectl get all -n database
+          echo ""
+          echo "=========================================="
+          echo "PGADMIN SERVICES"
+          echo "=========================================="
+
+          kubectl get svc \
+            -n database
+
+
+          echo ""
+          echo "=========================================="
+          echo "ALL DATABASE RESOURCES"
+          echo "=========================================="
+
+          kubectl get all \
+            -n database
 
 
 # ============================================================
-# STAGE 4 - VERIFY
+# STAGE 4
+# FINAL VERIFICATION
 # ============================================================
 
 - stage: Verify
-  displayName: 'Verify PostgreSQL and pgAdmin'
+
+  displayName: '4. Final Verification'
 
   dependsOn: Deploy_pgAdmin
 
   jobs:
-  - job: Verify
-    displayName: 'Verify Kubernetes Resources'
+
+  - job: FinalVerification
+
+    displayName: 'Verify PostgreSQL and pgAdmin'
 
     steps:
 
     # --------------------------------------------------------
-    # CHECKOUT REPOSITORY
+    # Checkout Repository
     # --------------------------------------------------------
 
     - checkout: self
-      displayName: 'Checkout Repository'
 
 
     # --------------------------------------------------------
-    # VERIFY AKS
+    # Final Verification
     # --------------------------------------------------------
 
     - task: AzureCLI@2
-      displayName: 'Verify Kubernetes Resources'
+
+      displayName: 'Final AKS Verification'
+
       inputs:
+
         connectionType: 'Azure Resource Manager'
+
         azureSubscription: '$(azureServiceConnection)'
+
         scriptType: 'bash'
+
         scriptLocation: 'inlineScript'
 
         inlineScript: |
 
           set -e
 
-          echo "======================================"
-          echo "Getting AKS Credentials"
-          echo "======================================"
+          echo ""
+          echo "##################################################"
+          echo "# FINAL AKS VERIFICATION"
+          echo "##################################################"
+
+
+          # --------------------------------------------------
+          # AKS Credentials
+          # --------------------------------------------------
+
+          echo ""
+          echo "=========================================="
+          echo "AKS CONTEXT"
+          echo "=========================================="
 
           az aks get-credentials \
             --resource-group "$(resourceGroup)" \
             --name "$(aksCluster)" \
             --overwrite-existing
 
-          echo "======================================"
-          echo "Current Context"
-          echo "======================================"
-
           kubectl config current-context
 
-          echo "======================================"
-          echo "Namespaces"
-          echo "======================================"
 
-          kubectl get namespaces
+          # --------------------------------------------------
+          # Namespace
+          # --------------------------------------------------
 
-          echo "======================================"
-          echo "PostgreSQL / pgAdmin Deployments"
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "DATABASE NAMESPACE"
+          echo "=========================================="
 
-          kubectl get deployments -n database
+          kubectl get namespace database
 
-          echo "======================================"
-          echo "Pods"
-          echo "======================================"
 
-          kubectl get pods -n database -o wide
+          # --------------------------------------------------
+          # Deployments
+          # --------------------------------------------------
 
-          echo "======================================"
-          echo "Services"
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "DATABASE DEPLOYMENTS"
+          echo "=========================================="
 
-          kubectl get svc -n database
+          kubectl get deployments \
+            -n database
 
-          echo "======================================"
-          echo "PVC"
-          echo "======================================"
 
-          kubectl get pvc -n database
+          # --------------------------------------------------
+          # Pods
+          # --------------------------------------------------
 
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "DATABASE PODS"
+          echo "=========================================="
+
+          kubectl get pods \
+            -n database \
+            -o wide
+
+
+          # --------------------------------------------------
+          # Services
+          # --------------------------------------------------
+
+          echo ""
+          echo "=========================================="
+          echo "DATABASE SERVICES"
+          echo "=========================================="
+
+          kubectl get svc \
+            -n database
+
+
+          # --------------------------------------------------
+          # PVC
+          # --------------------------------------------------
+
+          echo ""
+          echo "=========================================="
+          echo "PERSISTENT VOLUME CLAIMS"
+          echo "=========================================="
+
+          kubectl get pvc \
+            -n database
+
+
+          # --------------------------------------------------
+          # All Resources
+          # --------------------------------------------------
+
+          echo ""
+          echo "=========================================="
           echo "ALL DATABASE RESOURCES"
-          echo "======================================"
+          echo "=========================================="
 
-          kubectl get all -n database
+          kubectl get all \
+            -n database
 
-          echo "======================================"
-          echo "ALL CLUSTER PODS"
-          echo "======================================"
 
-          kubectl get pods -A
+          # --------------------------------------------------
+          # PostgreSQL Service
+          # --------------------------------------------------
 
-          echo "======================================"
-          echo "ALL CLUSTER SERVICES"
-          echo "======================================"
+          echo ""
+          echo "=========================================="
+          echo "POSTGRESQL SERVICE"
+          echo "=========================================="
 
-          kubectl get svc -A
+          kubectl get svc postgres \
+            -n database \
+            || true
+
+
+          # --------------------------------------------------
+          # pgAdmin Service
+          # --------------------------------------------------
+
+          echo ""
+          echo "=========================================="
+          echo "PGADMIN SERVICE"
+          echo "=========================================="
+
+          kubectl get svc pgadmin \
+            -n database \
+            || true
+
+
+          # --------------------------------------------------
+          # Pod Status
+          # --------------------------------------------------
+
+          echo ""
+          echo "=========================================="
+          echo "POD STATUS"
+          echo "=========================================="
+
+          kubectl get pods \
+            -n database \
+            -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,READY:.status.containerStatuses[*].ready
+
+
+          # --------------------------------------------------
+          # Final Message
+          # --------------------------------------------------
+
+          echo ""
+          echo "##################################################"
+          echo "# POSTGRESQL + PGADMIN DEPLOYMENT COMPLETED"
+          echo "##################################################"
