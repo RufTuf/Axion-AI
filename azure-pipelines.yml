@@ -30,7 +30,7 @@ stages:
           inputs:
             connectionType: 'azureRM'
             azureSubscription: 'axion_service_connection'
-            scriptType: 'batch'
+            scriptType: 'bash'
             scriptLocation: 'inlineScript'
             inlineScript: |
               echo "Getting AKS credentials..."
