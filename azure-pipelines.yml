@@ -254,7 +254,7 @@ stages:
           echo "CREATING DATABASE NAMESPACE"
           echo "=========================================="
 
-          kubectl create namespace database \
+          kubectl create namespace default \
             --dry-run=client \
             -o yaml | kubectl apply -f -
 
@@ -264,7 +264,7 @@ stages:
           echo "DATABASE NAMESPACE"
           echo "=========================================="
 
-          kubectl get namespace database
+          kubectl get namespace default
 
 
           echo ""
@@ -293,7 +293,7 @@ stages:
           echo "=========================================="
 
           kubectl get deployments \
-            -n database
+            -n default
 
 
           echo ""
@@ -312,7 +312,7 @@ stages:
           echo "=========================================="
 
           kubectl get svc \
-            -n database
+            -n default
 
 
           echo ""
@@ -321,7 +321,7 @@ stages:
           echo "=========================================="
 
           kubectl get all \
-            -n database
+            -n default
 
 
 # ============================================================
@@ -439,10 +439,10 @@ stages:
           echo "=========================================="
 
           kubectl get pods \
-            -n database
+            -n default
 
           kubectl get svc \
-            -n database
+            -n default
 
 
           echo ""
@@ -451,7 +451,7 @@ stages:
           echo "=========================================="
 
           kubectl apply \
-            -n database \
+            -n default \
             -f "$(k8sDirectory)/pgadmin-deployment.yml"
 
 
@@ -461,7 +461,7 @@ stages:
           echo "=========================================="
 
           kubectl apply \
-            -n database \
+            -n default \
             -f "$(k8sDirectory)/pgadmin-service.yaml"
 
 
@@ -480,7 +480,7 @@ stages:
           echo "=========================================="
 
           kubectl get pods \
-            -n database \
+            -n default \
             -o wide
 
 
@@ -490,7 +490,7 @@ stages:
           echo "=========================================="
 
           kubectl get svc \
-            -n database
+            -n default
 
 
           echo ""
@@ -499,7 +499,7 @@ stages:
           echo "=========================================="
 
           kubectl get all \
-            -n database
+            -n default
 
 
 # ============================================================
@@ -582,7 +582,7 @@ stages:
           echo "DATABASE NAMESPACE"
           echo "=========================================="
 
-          kubectl get namespace database
+          kubectl get namespace default
 
 
           # --------------------------------------------------
@@ -595,7 +595,7 @@ stages:
           echo "=========================================="
 
           kubectl get deployments \
-            -n database
+            -n default
 
 
           # --------------------------------------------------
@@ -608,7 +608,7 @@ stages:
           echo "=========================================="
 
           kubectl get pods \
-            -n database \
+            -n default \
             -o wide
 
 
@@ -622,7 +622,7 @@ stages:
           echo "=========================================="
 
           kubectl get svc \
-            -n database
+            -n default
 
 
           # --------------------------------------------------
@@ -648,7 +648,7 @@ stages:
           echo "=========================================="
 
           kubectl get all \
-            -n database
+            -n default
 
 
           # --------------------------------------------------
@@ -661,7 +661,7 @@ stages:
           echo "=========================================="
 
           kubectl get svc postgres \
-            -n database \
+            -n default \
             || true
 
 
@@ -689,7 +689,7 @@ stages:
           echo "=========================================="
 
           kubectl get pods \
-            -n database \
+            -n default \
             -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,READY:.status.containerStatuses[*].ready
 
 
