@@ -1,54 +1,59 @@
+
 name: ingestion
 
 trigger:
-- main
+  - main
 
-pool: Default
+pool:
+  name: Default
 
 stages:
+  # ============================================================
+  # Stage 1: Build and Push Docker Image
+  # ============================================================
+  - stage: DockerBuild
+    displayName: Build and Push Docker Image
 
-# ============================================================
-# docker Install
-# ============================================================
+    jobs:
+      - job: DockerBuildJob
+        displayName: Build Ingestion Image
 
- - stage: dockerinstall
-   displayName: docker install
-   jobs:
-     - job: dockerinstall
-       displayName: docker intall
-       steps:
-       - task: AzureCLI@2
-         displayName: Build Ingestion Docker Image
-         inputs:
-           azureSubscription: '1a39c6ac-4bf8-406a-be20-298e2ae5b5ce'
-           scriptType: bash
-           scriptLocation: inlineScript
-           inlineScript: |
-            cd "$(Build.SourcesDirectory)/axion-ingestion-service"
-            docker build -t axion-ingestion:latest .
+        steps:
+          - checkout: self
 
-       - task: Docker@2
-         inputs:
-           containerRegistry: 'Docker-Registry'
-           repository: 'Axion-AI'
-           command: 'buildAndPush'
-           Dockerfile: '**/Dockerfile'
-           tags: '$(Build.BuildId)/Axion-ai/Axion_AI_Ops'
+          - task: Docker@2
+            displayName: Build and Push Ingestion Image
+            inputs:
+              containerRegistry: 'Docker-Registry'
+              repository: 'Axion-AI/axion-ingestion'
+              command: 'buildAndPush'
+              Dockerfile: '$(Build.SourcesDirectory)/axion-ingestion-service/Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)/axion-ingestion-service'
+              tags: |
+                $(Build.BuildId)
 
-# ============================================================
-# Image deploy on Pod
-# ============================================================
- - stage: Imagedeploy
-   displayName: Image deploy on pod
+  # ============================================================
+  # Stage 2: Deploy Image to AKS
+  # ============================================================
+  - stage: ImageDeploy
+    displayName: Deploy Image to AKS
+    dependsOn: DockerBuild
 
-   jobs:
-     - job: image-deployment
-       displayName: imgae deployment
-       steps:
-       - task: KubernetesManifest@1
-         inputs:
-           action: 'deploy'
-           connectionType: 'kubernetesServiceConnection'
-           kubernetesServiceConnection: 'axion-aks'
-           namespace: 'default'
-           manifests: '$(Build.BuildId)/Axion-ai/Axion_AI_Ops'
+    jobs:
+      - job: DeployJob
+        displayName: Deploy Ingestion Application
+
+        steps:
+          - checkout: self
+
+          - task: KubernetesManifest@1
+            displayName: Deploy to AKS
+            inputs:
+              action: 'deploy'
+              connectionType: 'kubernetesServiceConnection'
+              kubernetesServiceConnection: 'axion-aks'
+              namespace: 'default'
+              manifests: |
+                $(Build.SourcesDirectory)/axion-ingestion-service/k8s/deployment.yaml
+              containers: |
+                YOUR_REGISTRY_HOST/Axion-AI/axion-ingestion:$(Build.BuildId)
