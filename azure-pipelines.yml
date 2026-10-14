@@ -273,7 +273,7 @@ stages:
           echo "=========================================="
 
           kubectl apply \
-            -n database \
+            -n default \
             -f "$(k8sDirectory)/postgresssql.yml"
 
 
@@ -283,7 +283,7 @@ stages:
           echo "=========================================="
 
           kubectl apply \
-            -n database \
+            -n default \
             -f "$(k8sDirectory)/postgres-service.yaml"
 
 
@@ -302,7 +302,7 @@ stages:
           echo "=========================================="
 
           kubectl get pods \
-            -n database \
+            -n default \
             -o wide
 
 
