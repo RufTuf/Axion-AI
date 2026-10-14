@@ -17,5 +17,38 @@ stages:
      - job: dockerinstall
        displayName: docker intall
        steps:
-       
+       - task: AzureCLI@2
+         displayName: Build Ingestion Docker Image
+         inputs:
+           azureSubscription: '1a39c6ac-4bf8-406a-be20-298e2ae5b5ce'
+           scriptType: bash
+           scriptLocation: inlineScript
+           inlineScript: |
+            cd "$(Build.SourcesDirectory)/axion-ingestion-service"
+            docker build -t axion-ingestion:latest .
 
+       - task: Docker@2
+         inputs:
+           containerRegistry: 'Docker-Registry'
+           repository: 'Axion-AI'
+           command: 'buildAndPush'
+           Dockerfile: '**/Dockerfile'
+           tags: '$(Build.BuildId)/Axion-ai/Axion_AI_Ops'
+
+# ============================================================
+# Image deploy on Pod
+# ============================================================
+ - stage: Imagedeploy
+   displayName: Image deploy on pod
+
+   jobs:
+     - job: image-deployment
+       displayName: imgae deployment
+       steps:
+       - task: KubernetesManifest@1
+         inputs:
+           action: 'deploy'
+           connectionType: 'kubernetesServiceConnection'
+           kubernetesServiceConnection: 'axion-aks'
+           namespace: 'default'
+           manifests: '$(Build.BuildId)/Axion-ai/Axion_AI_Ops'
