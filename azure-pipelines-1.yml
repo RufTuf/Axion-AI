@@ -1,0 +1,21 @@
+name: ingestion
+
+trigger:
+- main
+
+pool: Default
+
+stages:
+
+# ============================================================
+# docker Install
+# ============================================================
+
+ - stage: dockerinstall
+   displayName: docker install
+   jobs:
+     - job: dockerinstall
+       displayName: docker intall
+       steps:
+       
+
